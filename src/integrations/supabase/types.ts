@@ -14,7 +14,137 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      lectures: {
+        Row: {
+          audio_url: string | null
+          concept_map: Json | null
+          created_at: string
+          description: string | null
+          detailed_summary: string | null
+          flashcards: Json | null
+          id: string
+          short_summary: string | null
+          status: string
+          teacher_id: string
+          title: string
+          transcript: string | null
+          updated_at: string
+        }
+        Insert: {
+          audio_url?: string | null
+          concept_map?: Json | null
+          created_at?: string
+          description?: string | null
+          detailed_summary?: string | null
+          flashcards?: Json | null
+          id?: string
+          short_summary?: string | null
+          status?: string
+          teacher_id: string
+          title: string
+          transcript?: string | null
+          updated_at?: string
+        }
+        Update: {
+          audio_url?: string | null
+          concept_map?: Json | null
+          created_at?: string
+          description?: string | null
+          detailed_summary?: string | null
+          flashcards?: Json | null
+          id?: string
+          short_summary?: string | null
+          status?: string
+          teacher_id?: string
+          title?: string
+          transcript?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lectures_teacher_id_fkey"
+            columns: ["teacher_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string
+          full_name: string | null
+          id: string
+          role: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          full_name?: string | null
+          id?: string
+          role: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          full_name?: string | null
+          id?: string
+          role?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      student_notes: {
+        Row: {
+          created_at: string
+          highlights: Json | null
+          id: string
+          lecture_id: string
+          notes: string | null
+          student_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          highlights?: Json | null
+          id?: string
+          lecture_id: string
+          notes?: string | null
+          student_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          highlights?: Json | null
+          id?: string
+          lecture_id?: string
+          notes?: string | null
+          student_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_notes_lecture_id_fkey"
+            columns: ["lecture_id"]
+            isOneToOne: false
+            referencedRelation: "lectures"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_notes_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
