@@ -6,6 +6,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { TeacherDashboard } from '@/components/teacher/TeacherDashboard';
 import { StudentDashboard } from '@/components/student/StudentDashboard';
 import { LectureUpload } from '@/components/teacher/LectureUpload';
+import { LectureManagement } from '@/components/teacher/LectureManagement';
 
 const Index = () => {
   const { user, profile, loading } = useAuth();
@@ -50,12 +51,7 @@ const Index = () => {
         case 'upload':
           return <LectureUpload />;
         case 'lectures':
-          return (
-            <div className="p-6">
-              <h1 className="text-3xl font-bold mb-4">My Lectures</h1>
-              <p className="text-muted-foreground">Lecture management coming soon...</p>
-            </div>
-          );
+          return <LectureManagement />;
         case 'settings':
           return (
             <div className="p-6">
