@@ -7,6 +7,7 @@ import { TeacherDashboard } from '@/components/teacher/TeacherDashboard';
 import { StudentDashboard } from '@/components/student/StudentDashboard';
 import { LectureUpload } from '@/components/teacher/LectureUpload';
 import { LectureManagement } from '@/components/teacher/LectureManagement';
+import { LectureBrowser } from '@/components/student/LectureBrowser';
 
 const Index = () => {
   const { user, profile, loading } = useAuth();
@@ -65,12 +66,7 @@ const Index = () => {
     } else {
       switch (currentPage) {
         case 'lectures':
-          return (
-            <div className="p-6">
-              <h1 className="text-3xl font-bold mb-4">Available Lectures</h1>
-              <p className="text-muted-foreground">Lecture browser coming soon...</p>
-            </div>
-          );
+          return <LectureBrowser />;
         case 'notes':
           return (
             <div className="p-6">
