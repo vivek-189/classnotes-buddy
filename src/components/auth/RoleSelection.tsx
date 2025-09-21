@@ -49,7 +49,13 @@ export const RoleSelection = () => {
             onValueChange={(value) => setSelectedRole(value as 'teacher' | 'student')}
             className="space-y-4"
           >
-            <div className="flex items-center space-x-3 rounded-lg border p-4 cursor-pointer hover:bg-accent">
+            <div
+              className={`flex items-center space-x-3 rounded-lg border p-4 cursor-pointer hover:bg-accent ${selectedRole === 'teacher' ? 'ring-2 ring-primary' : ''}`}
+              onClick={() => setSelectedRole('teacher')}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSelectedRole('teacher'); }}
+            >
               <RadioGroupItem value="teacher" id="teacher" />
               <GraduationCap className="h-6 w-6 text-primary" />
               <div className="flex-1">
@@ -62,7 +68,13 @@ export const RoleSelection = () => {
               </div>
             </div>
             
-            <div className="flex items-center space-x-3 rounded-lg border p-4 cursor-pointer hover:bg-accent">
+            <div
+              className={`flex items-center space-x-3 rounded-lg border p-4 cursor-pointer hover:bg-accent ${selectedRole === 'student' ? 'ring-2 ring-primary' : ''}`}
+              onClick={() => setSelectedRole('student')}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSelectedRole('student'); }}
+            >
               <RadioGroupItem value="student" id="student" />
               <Users className="h-6 w-6 text-primary" />
               <div className="flex-1">
