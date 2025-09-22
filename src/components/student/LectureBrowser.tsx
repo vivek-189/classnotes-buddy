@@ -9,10 +9,15 @@ import {
   Search,
   Calendar,
   User,
-  Clock
+  Clock,
+  FileText,
+  Image,
+  Video,
+  FileAudio
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { LectureViewer } from './LectureViewer';
 
 interface Lecture {
   id: string;
@@ -29,6 +34,7 @@ export const LectureBrowser = () => {
   const [filteredLectures, setFilteredLectures] = useState<Lecture[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedLecture, setSelectedLecture] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -75,13 +81,18 @@ export const LectureBrowser = () => {
   };
 
   const handleLectureClick = (lectureId: string) => {
-    // This would navigate to the lecture detail view
-    console.log('Navigate to lecture:', lectureId);
-    toast({
-      title: 'Coming Soon',
-      description: 'Lecture viewer will be available soon!'
-    });
+    setSelectedLecture(lectureId);
   };
+
+  // If a lecture is selected, show the lecture viewer
+  if (selectedLecture) {
+    return (
+      <LectureViewer 
+        lectureId={selectedLecture} 
+        onBack={() => setSelectedLecture(null)} 
+      />
+    );
+  }
 
   if (loading) {
     return (

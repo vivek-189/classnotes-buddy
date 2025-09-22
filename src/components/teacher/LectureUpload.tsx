@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,28 +13,78 @@ import {
   Play, 
   Pause,
   File,
-  CheckCircle
+  CheckCircle,
+  FileText,
+  Image,
+  Video,
+  FileAudio,
+  X
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 
+declare global {
+  interface Window {
+    webkitSpeechRecognition: any;
+    SpeechRecognition: any;
+  }
+}
+
 export const LectureUpload = () => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [isRecording, setIsRecording] = useState(false);
-  const [audioFile, setAudioFile] = useState<File | null>(null);
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [transcript, setTranscript] = useState('');
+  const [isListening, setIsListening] = useState(false);
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const recognitionRef = useRef<any>(null);
   
   const { user } = useAuth();
   const { toast } = useToast();
+
+  // Initialize Speech Recognition
+  useEffect(() => {
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      const SpeechRecognitionConstructor = window.webkitSpeechRecognition || window.SpeechRecognition;
+      recognitionRef.current = new SpeechRecognitionConstructor();
+      recognitionRef.current.continuous = true;
+      recognitionRef.current.interimResults = true;
+      recognitionRef.current.lang = 'en-US';
+
+      recognitionRef.current.onresult = (event: any) => {
+        let finalTranscript = '';
+
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const transcriptSegment = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            finalTranscript += transcriptSegment + ' ';
+          }
+        }
+
+        if (finalTranscript) {
+          setTranscript(prev => prev + finalTranscript);
+        }
+      };
+
+      recognitionRef.current.onerror = (event: any) => {
+        console.error('Speech recognition error:', event.error);
+        setIsListening(false);
+      };
+
+      recognitionRef.current.onend = () => {
+        setIsListening(false);
+      };
+    }
+  }, []);
 
   const startRecording = async () => {
     try {
@@ -70,10 +120,17 @@ export const LectureUpload = () => {
       
       mediaRecorderRef.current.start(1000);
       setIsRecording(true);
+
+      // Start speech recognition
+      if (recognitionRef.current) {
+        recognitionRef.current.start();
+        setIsListening(true);
+        setTranscript(''); // Clear previous transcript
+      }
       
       toast({
         title: 'Recording started',
-        description: 'Speak clearly into your microphone'
+        description: 'Speak clearly into your microphone. Live transcription is active.'
       });
     } catch (error) {
       console.error('Error starting recording:', error);
@@ -90,33 +147,49 @@ export const LectureUpload = () => {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
       
+      // Stop speech recognition
+      if (recognitionRef.current && isListening) {
+        recognitionRef.current.stop();
+        setIsListening(false);
+      }
+      
       toast({
         title: 'Recording stopped',
-        description: 'You can now review your recording'
+        description: 'You can now review your recording and transcript'
       });
     }
   };
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      if (file.type.startsWith('audio/')) {
-        setAudioFile(file);
-        setAudioUrl(URL.createObjectURL(file));
-        setAudioBlob(null);
-        
-        toast({
-          title: 'File selected',
-          description: `Selected: ${file.name}`
-        });
-      } else {
-        toast({
-          title: 'Invalid file type',
-          description: 'Please select an audio file',
-          variant: 'destructive'
-        });
-      }
+    const files = Array.from(event.target.files || []);
+    if (files.length > 0) {
+      setUploadedFiles(prev => [...prev, ...files]);
+      
+      toast({
+        title: 'Files selected',
+        description: `Added ${files.length} file${files.length > 1 ? 's' : ''}`
+      });
     }
+  };
+
+  const removeFile = (index: number) => {
+    setUploadedFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const getFileIcon = (file: File) => {
+    if (file.type.startsWith('image/')) return <Image className="h-4 w-4" />;
+    if (file.type.startsWith('video/')) return <Video className="h-4 w-4" />;
+    if (file.type.startsWith('audio/')) return <FileAudio className="h-4 w-4" />;
+    if (file.type.includes('pdf') || file.type.includes('document')) return <FileText className="h-4 w-4" />;
+    return <File className="h-4 w-4" />;
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -131,10 +204,10 @@ export const LectureUpload = () => {
       return;
     }
 
-    if (!audioFile && !audioBlob) {
+    if (uploadedFiles.length === 0 && !audioBlob) {
       toast({
-        title: 'Audio required',
-        description: 'Please record or upload an audio file',
+        title: 'Content required',
+        description: 'Please record audio or upload files for your lecture',
         variant: 'destructive'
       });
       return;
@@ -151,6 +224,7 @@ export const LectureUpload = () => {
           teacher_id: user?.id,
           title: title.trim(),
           description: description.trim() || null,
+          transcript: transcript.trim() || null,
           status: 'draft'
         })
         .select()
@@ -158,27 +232,71 @@ export const LectureUpload = () => {
 
       if (lectureError) throw lectureError;
 
-      setUploadProgress(50);
+      setUploadProgress(30);
 
-      // Here you would typically:
-      // 1. Upload the audio file to storage
-      // 2. Send it to an AI service for transcription
-      // 3. Generate summaries and flashcards
-      // For now, we'll just save the basic lecture info
+      // Upload files to storage
+      const fileUploads = [];
+      
+      // Upload recorded audio if exists
+      if (audioBlob) {
+        const audioFileName = `recording-${Date.now()}.webm`;
+        // Create a file-like object for upload
+        const audioFileForUpload = new Blob([audioBlob], { type: 'audio/webm' });
+        Object.defineProperty(audioFileForUpload, 'name', {
+          value: audioFileName,
+          writable: false
+        });
+        fileUploads.push(audioFileForUpload as File);
+      }
+
+      // Add uploaded files
+      fileUploads.push(...uploadedFiles);
+
+      // Upload each file
+      const uploadedUrls = [];
+      for (let i = 0; i < fileUploads.length; i++) {
+        const file = fileUploads[i];
+        const fileName = `${lecture.id}/${Date.now()}-${file.name}`;
+        
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('lecture-files')
+          .upload(fileName, file, {
+            cacheControl: '3600',
+            upsert: false
+          });
+
+        if (uploadError) throw uploadError;
+
+        uploadedUrls.push(uploadData.path);
+        setUploadProgress(30 + ((i + 1) / fileUploads.length) * 60);
+      }
+
+      // Update lecture with first uploaded file URL (for primary content)
+      if (uploadedUrls.length > 0) {
+        const { data } = await supabase.storage
+          .from('lecture-files')
+          .getPublicUrl(uploadedUrls[0]);
+
+        await supabase
+          .from('lectures')
+          .update({ audio_url: data.publicUrl })
+          .eq('id', lecture.id);
+      }
 
       setUploadProgress(100);
 
       toast({
         title: 'Lecture uploaded successfully!',
-        description: 'Your lecture has been saved as a draft. You can edit and publish it later.'
+        description: 'Your lecture has been saved as a draft. You can publish it from the lecture management page.'
       });
 
       // Reset form
       setTitle('');
       setDescription('');
-      setAudioFile(null);
+      setUploadedFiles([]);
       setAudioBlob(null);
       setAudioUrl(null);
+      setTranscript('');
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
@@ -199,9 +317,9 @@ export const LectureUpload = () => {
   return (
     <div className="p-6 max-w-2xl mx-auto">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold">Upload New Lecture</h1>
+        <h1 className="text-3xl font-bold">Create New Lecture</h1>
         <p className="text-muted-foreground">
-          Record or upload audio to create AI-powered lecture notes
+          Record audio, upload any files, and create AI-powered lecture content
         </p>
       </div>
 
@@ -239,12 +357,12 @@ export const LectureUpload = () => {
           </CardContent>
         </Card>
 
-        {/* Audio Input */}
+        {/* Content Upload */}
         <Card>
           <CardHeader>
-            <CardTitle>Audio Content</CardTitle>
+            <CardTitle>Lecture Content</CardTitle>
             <CardDescription>
-              Record live or upload an existing audio file
+              Record live audio with speech-to-text or upload any type of files
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -276,28 +394,45 @@ export const LectureUpload = () => {
                 className="gap-2"
               >
                 <Upload className="h-4 w-4" />
-                Upload File
+                Upload Files
               </Button>
               
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="audio/*"
+                multiple
+                accept="*/*"
                 onChange={handleFileUpload}
                 className="hidden"
               />
             </div>
 
+            {/* Live Transcript */}
+            {(isRecording || transcript) && (
+              <div className="space-y-2">
+                <Label>Live Transcript</Label>
+                <div className="p-4 border rounded-lg bg-muted/50 min-h-[100px]">
+                  {isListening && (
+                    <div className="flex items-center gap-2 mb-2 text-sm text-muted-foreground">
+                      <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                      Listening...
+                    </div>
+                  )}
+                  <p className="text-sm whitespace-pre-wrap">
+                    {transcript || 'Start speaking to see live transcription...'}
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Audio Preview */}
             {audioUrl && (
               <div className="space-y-2">
-                <Label>Audio Preview</Label>
+                <Label>Recorded Audio</Label>
                 <div className="flex items-center gap-4 p-4 border rounded-lg">
-                  <File className="h-8 w-8 text-muted-foreground" />
+                  <FileAudio className="h-8 w-8 text-muted-foreground" />
                   <div className="flex-1">
-                    <p className="font-medium">
-                      {audioFile ? audioFile.name : 'Recorded Audio'}
-                    </p>
+                    <p className="font-medium">Recorded Audio</p>
                     <audio controls className="w-full mt-2">
                       <source src={audioUrl} type="audio/webm" />
                       Your browser does not support the audio element.
@@ -307,11 +442,48 @@ export const LectureUpload = () => {
               </div>
             )}
 
+            {/* Uploaded Files */}
+            {uploadedFiles.length > 0 && (
+              <div className="space-y-2">
+                <Label>Uploaded Files ({uploadedFiles.length})</Label>
+                <div className="space-y-2 max-h-60 overflow-y-auto">
+                  {uploadedFiles.map((file, index) => (
+                    <div key={index} className="flex items-center gap-3 p-3 border rounded-lg">
+                      {getFileIcon(file)}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{file.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {file.type || 'Unknown type'} • {formatFileSize(file.size)}
+                        </p>
+                        {/* File Preview for Images */}
+                        {file.type.startsWith('image/') && (
+                          <img 
+                            src={URL.createObjectURL(file)} 
+                            alt={file.name}
+                            className="mt-2 max-w-32 max-h-20 object-cover rounded border"
+                          />
+                        )}
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeFile(index)}
+                        className="text-red-500 hover:text-red-700"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {isRecording && (
               <Alert>
                 <Mic className="h-4 w-4" />
                 <AlertDescription>
-                  Recording in progress... Speak clearly into your microphone.
+                  Recording in progress with live transcription... Speak clearly into your microphone.
                 </AlertDescription>
               </Alert>
             )}
@@ -337,14 +509,14 @@ export const LectureUpload = () => {
         <Button 
           type="submit" 
           className="w-full" 
-          disabled={uploading || (!audioFile && !audioBlob)}
+          disabled={uploading || (uploadedFiles.length === 0 && !audioBlob)}
         >
           {uploading ? (
             'Processing Lecture...'
           ) : (
             <>
               <Upload className="h-4 w-4 mr-2" />
-              Upload Lecture
+              Create Lecture
             </>
           )}
         </Button>
